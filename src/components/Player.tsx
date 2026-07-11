@@ -30,7 +30,7 @@ export const Player: React.FC<PlayerProps> = ({ x, y, cellSize }) => {
           }}
         />
         <img
-          src="/player.png"
+          src="./player.png"
           alt="Player"
           className="w-full h-full object-contain rounded-lg drop-shadow-lg"
           style={{

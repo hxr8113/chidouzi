@@ -37,7 +37,7 @@ export const Food: React.FC<FoodProps> = ({ x, y, cellSize }) => {
           }}
         />
         <img
-          src="/food.png"
+          src="./food.png"
           alt="Food"
           className="w-full h-full object-contain rounded-lg"
           style={{
