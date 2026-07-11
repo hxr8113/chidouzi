@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小怪兽吃雪糕 · 多关卡版</title>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #fce4ec;
+    font-family: 'Arial', sans-serif;
+  }
+  #gameContainer {
+    position: relative;
+    background-color: #fff8e1;
+    border: 8px solid #795548;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  canvas {
+    display: block;
+    background-color: #fdf0d5;
+  }
+  #ui {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    display: flex;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 5px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    color: #333;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-size: 14px;
+    z-index: 10;
+  }
+  #winMessage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #ffab00;
+    color: #fff;
+    padding: 30px 50px;
+    border-radius: 30px;
+    font-size: 28px;
+    font-weight: bold;
+    text-shadow: 2px 2px 0 #ff6f00;
+    display: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    text-align: center;
+    pointer-events: none;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="600" height="600"></canvas>
+  <div id="ui">
+    <span>🏰 关卡: <span id="levelText">1</span></span>
+    <span>🎯 收集数: <span id="scoreText">0</span></span>
+  </div>
+  <div id="winMessage">🐷 全部吃光啦！<br><span style="font-size:18px;">准备进入下一关...</span></div>
+</div>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreText = document.getElementById('scoreText');
+  const levelText = document.getElementById('levelText');
+  const winMessage = document.getElementById('winMessage');
+
+  // --- 1. 加载图片 (请确保同文件夹下有抠好的透明背景图片) ---
+  const playerImg = new Image();
+  const foodImg = new Image();
+  playerImg.src = 'player.png'; // 橙色角色
+  foodImg.src = 'food.png';     // 灰色雪糕
+
+  let playerLoaded = false, foodLoaded = false;
+  playerImg.onload = () => playerLoaded = true;
+  foodImg.onload = () => foodLoaded = true;
+
+  // --- 2. 多关卡地图库 (0=通道, 1=墙壁) ---
+  const LEVELS = [
+    // 第 1 关：经典起始关卡
+    {
+      startX: 1, startY: 1,
+      map: [
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,1,0,0,0,0,0,0,1],
+        [1,0,1,0,1,0,1,1,1,0,0,1],
+        [1,0,1,0,0,0,0,0,1,0,0,1],
+        [1,0,1,1,1,1,0,0,1,1,0,1],
+        [1,0,0,0,0,1,0,0,0,0,0,1],
+        [1,1,1,0,0,1,0,1,1,0,0,1],
+        [1,0,0,0,0,0,0,1,0,0,0,1],
+        [1,0,1,1,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,1,0,1],
+        [1,0,1,1,1,1,1,1,1,1,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1]
+      ]
+    },
+    // 第 2 关：更复杂的回环地图 (起点在左下角)
+    {
+      startX: 1, startY: 10,
+      map: [
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,1,0,0,0,1,0,0,0,0,1],
+        [1,0,1,0,1,0,1,0,1,1,0,1],
+        [1,0,1,0,1,0,0,0,1,0,0,1],
+        [1,0,1,1,1,1,1,0,1,0,1,1],
+        [1,0,0,0,0,0,0,0,1,0,1,1],
+        [1,1,1,1,0,1,1,1,1,0,0,1],
+        [1,0,0,0,0,1,0,0,0,0,1,1],
+        [1,0,1,0,1,1,0,1,1,0,0,1],
+        [1,0,1,0,0,0,0,1,0,1,0,1],
+        [1,0,0,1,1,1,0,0,0,1,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1]
+      ]
+    },
+    // 第 3 关：难度较高的连环迷宫 (起点在右上角)
+    {
+      startX: 10, startY: 1,
+      map: [
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,1,0,0,1,0,1],
+        [1,1,1,1,1,0,1,0,0,1,0,1],
+        [1,0,0,0,1,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,1,0,1,1,0,1],
+        [1,0,1,0,0,0,1,0,1,0,0,1],
+        [1,0,1,0,1,1,1,0,1,0,1,1],
+        [1,0,0,0,1,0,0,0,0,0,0,1],
+        [1,0,1,0,1,0,1,0,1,1,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1]
+      ]
+    }
+  ];
+
+  const CELL_SIZE = canvas.width / 12;
+  const PLAYER_SIZE_GRID = 0.7; 
+  const FOOD_SIZE_GRID = 0.6;
+  const MOVE_SPEED = 0.05;
+
+  let currentLevelIndex = 0;
+  let currentMap = [];
+  let player = { x: 1, y: 1 }; 
+  let score = 0;
+  let foods = [];
+  let isLevelTransitioning = false; // 防止过关动画期间连续触发
+
+  // --- 3. 核心碰撞检测 ---
+  function willCollide(nextX, nextY, mapData) {
+    let margin = 0.001;
+    let leftCol = Math.floor(nextX + margin);
+    let rightCol = Math.floor(nextX + PLAYER_SIZE_GRID - margin);
+    let topRow = Math.floor(nextY + margin);
+    let bottomRow = Math.floor(nextY + PLAYER_SIZE_GRID - margin);
+
+    if (leftCol < 0 || rightCol >= 12 || topRow < 0 || bottomRow >= 12) return true;
+    return (mapData[topRow][leftCol] === 1 || mapData[topRow][rightCol] === 1 || 
+            mapData[bottomRow][leftCol] === 1 || mapData[bottomRow][rightCol] === 1);
+  }
+
+  // --- 4. 加载指定关卡 ---
+  function loadLevel(index) {
+    isLevelTransitioning = false;
+    winMessage.style.display = 'none';
+    const levelData = LEVELS[index];
+    if (!levelData) return; // 防止越界
+
+    currentMap = levelData.map;
+    player.x = levelData.startX;
+    player.y = levelData.startY;
+    score = 0;
+    foods = [];
+
+    // 根据当前地图生成食物
+    for (let row = 0; row < 12; row++) {
+      for (let col = 0; col < 12; col++) {
+        // 不能放在墙上，且不能放在玩家初始位置
+        if (currentMap[row][col] === 0 && !(row === player.y && col === player.x)) {
+          foods.push({ x: col, y: row });
+        }
+      }
+    }
+
+    scoreText.innerText = score;
+    levelText.innerText = index + 1;
+  }
+
+  // --- 5. 下一关逻辑 ---
+  function goToNextLevel() {
+    if (isLevelTransitioning) return;
+    if (currentLevelIndex + 1 < LEVELS.length) {
+      // 还有下一关
+      isLevelTransitioning = true;
+      winMessage.innerHTML = `🏆 第 ${currentLevelIndex + 1} 关通关！<br><span style="font-size:20px;">即将进入第 ${currentLevelIndex + 2} 关...</span>`;
+      winMessage.style.display = 'block';
+      
+      // 延迟 1.2 秒后自动进入下一关
+      setTimeout(() => {
+        currentLevelIndex++;
+        loadLevel(currentLevelIndex);
+      }, 1200);
+    } else {
+      // 最后一关已通关
+      winMessage.innerHTML = "🎉 恭喜通关所有关卡！ 🎉<br><span style='font-size:18px;'>你真是太厉害了！</span>";
+      winMessage.style.display = 'block';
+    }
+  }
+
+  // --- 6. 键盘控制 ---
+  let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+  document.addEventListener('keydown', (e) => {
+    if (e.key in keys) {
+      e.preventDefault();
+      keys[e.key] = true;
+    }
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.key in keys) {
+      e.preventDefault();
+      keys[e.key] = false;
+    }
+  });
+
+  // --- 7. 游戏主循环 ---
+  function update() {
+    let dx = 0, dy = 0;
+    if (keys.ArrowUp) dy = -MOVE_SPEED;
+    if (keys.ArrowDown) dy = MOVE_SPEED;
+    if (keys.ArrowLeft) dx = -MOVE_SPEED;
+    if (keys.ArrowRight) dx = MOVE_SPEED;
+
+    // X 轴移动
+    if (dx !== 0) {
+      let nextX = player.x + dx;
+      let nextY = player.y;
+      if (nextX < 1.0) nextX = 1.0;
+      if (nextX > 10.29) nextX = 10.29;
+
+      if (!willCollide(nextX, nextY, currentMap)) {
+        player.x = nextX;
+      }
+    }
+
+    // Y 轴移动
+    if (dy !== 0) {
+      let nextX = player.x;
+      let nextY = player.y + dy;
+      if (nextY < 1.0) nextY = 1.0;
+      if (nextY > 10.29) nextY = 10.29;
+
+      if (!willCollide(nextX, nextY, currentMap)) {
+        player.y = nextY;
+      }
+    }
+
+    // 吃食物判定
+    let playerCenter = {
+      x: player.x + PLAYER_SIZE_GRID / 2,
+      y: player.y + PLAYER_SIZE_GRID / 2
+    };
+
+    let eatenIndex = -1;
+    for (let i = 0; i < foods.length; i++) {
+      let f = foods[i];
+      let foodCenter = {
+        x: f.x + FOOD_SIZE_GRID / 2,
+        y: f.y + FOOD_SIZE_GRID / 2
+      };
+      let dist = Math.hypot(playerCenter.x - foodCenter.x, playerCenter.y - foodCenter.y);
+      if (dist < (PLAYER_SIZE_GRID / 2 + FOOD_SIZE_GRID / 2 - 0.2)) {
+        eatenIndex = i;
+        break;
+      }
+    }
+
+    if (eatenIndex !== -1) {
+      foods.splice(eatenIndex, 1);
+      score++;
+      scoreText.innerText = score;
+      
+      if (foods.length === 0) {
+        goToNextLevel(); // 收集完触发下一关
+      }
+    }
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  // --- 8. 绘制画面 ---
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#fdf0d5';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制墙壁
+    ctx.fillStyle = '#8d6e63';
+    for (let row = 0; row < 12; row++) {
+      for (let col = 0; col < 12; col++) {
+        if (currentMap[row][col] === 1) {
+          ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          ctx.fillStyle = '#a1887f';
+          ctx.fillRect(col * CELL_SIZE + 2, row * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+          ctx.fillStyle = '#8d6e63';
+        }
+      }
+    }
+
+    // 绘制食物
+    for (let f of foods) {
+      let x = f.x * CELL_SIZE + (CELL_SIZE - FOOD_SIZE_GRID * CELL_SIZE) / 2;
+      let y = f.y * CELL_SIZE + (CELL_SIZE - FOOD_SIZE_GRID * CELL_SIZE) / 2;
+      let size = FOOD_SIZE_GRID * CELL_SIZE;
+      if (foodLoaded) {
+        ctx.drawImage(foodImg, x, y, size, size);
+      }
+    }
+
+    // 绘制玩家
+    let px = player.x * CELL_SIZE + (CELL_SIZE - PLAYER_SIZE_GRID * CELL_SIZE) / 2;
+    let py = player.y * CELL_SIZE + (CELL_SIZE - PLAYER_SIZE_GRID * CELL_SIZE) / 2;
+    let size = PLAYER_SIZE_GRID * CELL_SIZE;
+    
+    if (playerLoaded) {
+      ctx.drawImage(playerImg, px, py, size, size);
+    }
+  }
+
+  // 9. 启动游戏 (默认加载第一关)
+  loadLevel(0);
+  update();
+
+</script>
+</body>
+</html>
