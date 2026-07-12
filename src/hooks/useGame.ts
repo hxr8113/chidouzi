@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Cell, generateMaze, canMove } from '../utils/mazeGenerator';
 import { getLevelConfig, getTotalLevels } from '../utils/levelConfig';
 
+const COMPLETED_LEVELS_KEY = 'chidouzi_completed_levels';
+
 export interface GameState {
   level: number;
   playerPosition: { x: number; y: number };
@@ -12,9 +14,19 @@ export interface GameState {
   isWin: boolean;
   timer: number;
   moveCount: number;
+  completedLevels: number[];
 }
 
 export const useGame = () => {
+  const loadCompletedLevels = (): number[] => {
+    try {
+      const saved = localStorage.getItem(COMPLETED_LEVELS_KEY);
+      return saved ? JSON.parse(saved) : [1];
+    } catch {
+      return [1];
+    }
+  };
+
   const [gameState, setGameState] = useState<GameState>({
     level: 1,
     playerPosition: { x: 0, y: 0 },
@@ -25,9 +37,14 @@ export const useGame = () => {
     isWin: false,
     timer: 0,
     moveCount: 0,
+    completedLevels: loadCompletedLevels(),
   });
 
   const timerRef = useRef<number | null>(null);
+
+  const saveCompletedLevels = useCallback((levels: number[]) => {
+    localStorage.setItem(COMPLETED_LEVELS_KEY, JSON.stringify(levels));
+  }, []);
 
   const startGame = useCallback((level: number = 1) => {
     const config = getLevelConfig(level);
@@ -35,7 +52,8 @@ export const useGame = () => {
     const foodX = config.gridSize - 1;
     const foodY = config.gridSize - 1;
 
-    setGameState({
+    setGameState((prev) => ({
+      ...prev,
       level,
       playerPosition: { x: 0, y: 0 },
       foodPosition: { x: foodX, y: foodY },
@@ -45,7 +63,7 @@ export const useGame = () => {
       isWin: false,
       timer: 0,
       moveCount: 0,
-    });
+    }));
   }, []);
 
   const movePlayer = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
@@ -80,6 +98,27 @@ export const useGame = () => {
       const totalLevels = getTotalLevels();
       const isCompleted = isWin && prev.level >= totalLevels;
 
+      if (isWin) {
+        const newCompletedLevels = [...prev.completedLevels];
+        if (!newCompletedLevels.includes(prev.level)) {
+          newCompletedLevels.push(prev.level);
+        }
+        const nextLevel = prev.level + 1;
+        if (nextLevel <= totalLevels && !newCompletedLevels.includes(nextLevel)) {
+          newCompletedLevels.push(nextLevel);
+        }
+        saveCompletedLevels(newCompletedLevels);
+
+        return {
+          ...prev,
+          playerPosition: { x: newX, y: newY },
+          moveCount: prev.moveCount + 1,
+          isWin,
+          isCompleted,
+          completedLevels: newCompletedLevels,
+        };
+      }
+
       return {
         ...prev,
         playerPosition: { x: newX, y: newY },
@@ -88,7 +127,7 @@ export const useGame = () => {
         isCompleted,
       };
     });
-  }, []);
+  }, [saveCompletedLevels]);
 
   const nextLevel = useCallback(() => {
     setGameState((prev) => {
@@ -99,6 +138,7 @@ export const useGame = () => {
       const foodY = config.gridSize - 1;
 
       return {
+        ...prev,
         level: nextLevelNum,
         playerPosition: { x: 0, y: 0 },
         foodPosition: { x: foodX, y: foodY },

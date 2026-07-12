@@ -25,11 +25,16 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-8 rounded-2xl border-2 border-green-500 shadow-2xl max-w-md mx-4 animate-bounce-slow" style={{ animationDuration: '1s' }}>
+      <div 
+        className="bg-gradient-to-br from-gray-800 to-gray-900 p-8 rounded-2xl border-2 border-green-500 shadow-2xl max-w-md mx-4"
+        style={{
+          animation: 'modalBounce 0.6s ease-in-out 2',
+        }}
+      >
         <div className="text-center">
           <div className="text-6xl mb-4">🎉</div>
           <h2 className="text-2xl font-bold text-green-400 mb-4">{title}</h2>
-          <p className="text-gray-300 mb-6">{message}</p>
+          <p className="text-gray-300 mb-6 whitespace-pre-line">{message}</p>
           <div className="flex flex-col gap-3">
             <button
               onClick={onButtonClick}
@@ -48,6 +53,12 @@ export const Modal: React.FC<ModalProps> = ({
           </div>
         </div>
       </div>
+      <style>{`
+        @keyframes modalBounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-20px); }
+        }
+      `}</style>
     </div>
   );
 };
