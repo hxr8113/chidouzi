@@ -134,7 +134,7 @@ const Game: React.FC = () => {
           <>
             <HUD gameState={gameState} />
 
-            <div className="relative w-full sm:w-auto max-h-[50vh] sm:max-h-none overflow-auto">
+            <div className="relative w-full sm:w-auto max-h-[50vh] sm:max-h-none overflow-auto sm:overflow-visible">
               <Maze maze={gameState.maze} cellSize={config.cellSize} />
               <Player
                 x={gameState.playerPosition.x}

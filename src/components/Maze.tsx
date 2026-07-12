@@ -14,7 +14,7 @@ export const Maze: React.FC<MazeProps> = ({ maze, cellSize }) => {
   const mazeHeight = gridSize * cellSize;
 
   return (
-    <div className="w-full max-w-full overflow-auto sm:overflow-visible sm:max-w-none">
+    <div className="w-full max-w-full">
       <div
         className="relative bg-gray-900 rounded-lg shadow-2xl border-4 border-red-500"
         style={{
