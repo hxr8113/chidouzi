@@ -4,17 +4,11 @@ type Direction = 'up' | 'down' | 'left' | 'right';
 
 interface GameControlsProps {
   onMove: (direction: Direction) => void;
+  onMoveToJunction: (direction: Direction) => void;
   enabled?: boolean;
 }
 
-export const GameControls: React.FC<GameControlsProps> = ({ onMove, enabled = true }) => {
-  const intervalRefs = useRef<{ [key in Direction]: number | null }>({
-    up: null,
-    down: null,
-    left: null,
-    right: null,
-  });
-
+export const GameControls: React.FC<GameControlsProps> = ({ onMove, onMoveToJunction, enabled = true }) => {
   const timeoutRefs = useRef<{ [key in Direction]: number | null }>({
     up: null,
     down: null,
@@ -22,39 +16,46 @@ export const GameControls: React.FC<GameControlsProps> = ({ onMove, enabled = tr
     right: null,
   });
 
-  const startMove = useCallback((direction: Direction) => {
+  const handleClick = (direction: Direction) => {
+    if (!enabled) return;
+    onMove(direction);
+  };
+
+  const handleMouseDown = useCallback((direction: Direction) => {
     if (!enabled) return;
     
-    onMove(direction);
-    
     timeoutRefs.current[direction] = window.setTimeout(() => {
-      intervalRefs.current[direction] = window.setInterval(() => {
-        onMove(direction);
-      }, 150);
+      onMoveToJunction(direction);
     }, 300);
-  }, [onMove, enabled]);
+  }, [enabled, onMoveToJunction]);
 
-  const stopMove = useCallback((direction: Direction) => {
+  const handleMouseUp = useCallback((direction: Direction) => {
     if (timeoutRefs.current[direction]) {
       clearTimeout(timeoutRefs.current[direction]);
       timeoutRefs.current[direction] = null;
     }
-    if (intervalRefs.current[direction]) {
-      clearInterval(intervalRefs.current[direction]);
-      intervalRefs.current[direction] = null;
-    }
   }, []);
 
-  const handleMouseDown = (direction: Direction) => startMove(direction);
-  const handleMouseUp = (direction: Direction) => stopMove(direction);
-  const handleMouseLeave = (direction: Direction) => stopMove(direction);
+  const handleMouseLeave = useCallback((direction: Direction) => {
+    handleMouseUp(direction);
+  }, [handleMouseUp]);
 
-  const handleTouchStart = (direction: Direction, e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((direction: Direction, e: React.TouchEvent) => {
     e.preventDefault();
-    startMove(direction);
-  };
-  const handleTouchEnd = (direction: Direction) => stopMove(direction);
-  const handleTouchCancel = (direction: Direction) => stopMove(direction);
+    if (!enabled) return;
+    
+    timeoutRefs.current[direction] = window.setTimeout(() => {
+      onMoveToJunction(direction);
+    }, 300);
+  }, [enabled, onMoveToJunction]);
+
+  const handleTouchEnd = useCallback((direction: Direction) => {
+    handleMouseUp(direction);
+  }, [handleMouseUp]);
+
+  const handleTouchCancel = useCallback((direction: Direction) => {
+    handleMouseUp(direction);
+  }, [handleMouseUp]);
 
   const buttonClass = `
     w-16 h-16 sm:w-20 sm:h-20
@@ -81,7 +82,7 @@ export const GameControls: React.FC<GameControlsProps> = ({ onMove, enabled = tr
     <button
       key={direction}
       className={buttonClass}
-      onClick={() => enabled && onMove(direction)}
+      onClick={() => handleClick(direction)}
       onMouseDown={() => handleMouseDown(direction)}
       onMouseUp={() => handleMouseUp(direction)}
       onMouseLeave={() => handleMouseLeave(direction)}
@@ -105,6 +106,7 @@ export const GameControls: React.FC<GameControlsProps> = ({ onMove, enabled = tr
       </div>
       <div className="mt-4 text-gray-400 text-xs text-center hidden sm:block">
         <p>使用键盘方向键或 WASD 控制</p>
+        <p className="mt-1">长按按钮快速移动到路口</p>
       </div>
     </div>
   );

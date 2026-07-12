@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useGame } from '../hooks/useGame';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { getLevelConfig, getTotalLevels } from '../utils/levelConfig';
@@ -9,8 +9,11 @@ import { GameControls } from '../components/GameControls';
 import { HUD } from '../components/HUD';
 import { Modal } from '../components/Modal';
 
+type Direction = 'up' | 'down' | 'left' | 'right';
+
 const Game: React.FC = () => {
-  const { gameState, startGame, movePlayer, nextLevel, resetGame } = useGame();
+  const { gameState, startGame, movePlayer, movePlayerToJunction, nextLevel, resetGame } = useGame();
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const config = getLevelConfig(gameState.level);
@@ -44,6 +47,48 @@ const Game: React.FC = () => {
   const handleBackToLevels = () => {
     setShowLevelSelect(true);
   };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!gameState.isPlaying || gameState.isWin || gameState.isCompleted) return;
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      time: Date.now(),
+    };
+  }, [gameState.isPlaying, gameState.isWin, gameState.isCompleted]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!gameState.isPlaying || gameState.isWin || gameState.isCompleted) return;
+    if (!touchStartRef.current) return;
+
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const startTime = touchStartRef.current.time;
+    
+    const deltaX = endX - touchStartRef.current.x;
+    const deltaY = endY - touchStartRef.current.y;
+    const deltaTime = Date.now() - startTime;
+
+    touchStartRef.current = null;
+
+    if (deltaTime > 500) return;
+
+    const minSwipeDistance = 30;
+
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (Math.max(absX, absY) < minSwipeDistance) return;
+
+    let direction: Direction;
+    if (absX > absY) {
+      direction = deltaX > 0 ? 'right' : 'left';
+    } else {
+      direction = deltaY > 0 ? 'down' : 'up';
+    }
+
+    movePlayerToJunction(direction);
+  }, [gameState.isPlaying, gameState.isWin, gameState.isCompleted, movePlayerToJunction]);
 
   const levelsPerPage = 10;
   const totalLevels = getTotalLevels();
@@ -134,7 +179,11 @@ const Game: React.FC = () => {
           <>
             <HUD gameState={gameState} />
 
-            <div className="relative w-full sm:w-auto max-h-[50vh] sm:max-h-none overflow-auto sm:overflow-visible">
+            <div 
+              className="relative w-full sm:w-auto max-h-[50vh] sm:max-h-none overflow-auto sm:overflow-visible touch-none"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
               <Maze maze={gameState.maze} cellSize={config.cellSize} />
               <Player
                 x={gameState.playerPosition.x}
@@ -150,6 +199,7 @@ const Game: React.FC = () => {
 
             <GameControls
               onMove={movePlayer}
+              onMoveToJunction={movePlayerToJunction}
               enabled={gameState.isPlaying && !gameState.isWin && !gameState.isCompleted}
             />
           </>

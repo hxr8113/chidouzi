@@ -116,3 +116,21 @@ export const canMove = (
       return false;
   }
 };
+
+export const isJunction = (
+  maze: Cell[][],
+  x: number,
+  y: number
+): boolean => {
+  const cell = maze[y]?.[x];
+  if (!cell) return false;
+
+  const openPaths = [
+    !cell.walls.top,
+    !cell.walls.right,
+    !cell.walls.bottom,
+    !cell.walls.left,
+  ].filter(Boolean).length;
+
+  return openPaths >= 3 || openPaths === 1;
+};

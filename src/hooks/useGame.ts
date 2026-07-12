@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Cell, generateMaze, canMove } from '../utils/mazeGenerator';
+import { Cell, generateMaze, canMove, isJunction } from '../utils/mazeGenerator';
 import { getLevelConfig, getTotalLevels } from '../utils/levelConfig';
 
 const COMPLETED_LEVELS_KEY = 'chidouzi_completed_levels';
@@ -152,6 +152,77 @@ export const useGame = () => {
     });
   }, []);
 
+  const movePlayerToJunction = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
+    setGameState((prev) => {
+      if (!prev.isPlaying || prev.isCompleted) return prev;
+
+      const { playerPosition, maze } = prev;
+      let { x, y } = playerPosition;
+
+      if (!canMove(maze, x, y, direction)) return prev;
+
+      let newX = x;
+      let newY = y;
+      let moves = 0;
+
+      do {
+        switch (direction) {
+          case 'up':
+            newY -= 1;
+            break;
+          case 'down':
+            newY += 1;
+            break;
+          case 'left':
+            newX -= 1;
+            break;
+          case 'right':
+            newX += 1;
+            break;
+        }
+        moves++;
+      } while (
+        canMove(maze, newX, newY, direction) &&
+        !isJunction(maze, newX, newY) &&
+        !(newX === prev.foodPosition.x && newY === prev.foodPosition.y)
+      );
+
+      const config = getLevelConfig(prev.level);
+      const isWin = newX === config.gridSize - 1 && newY === config.gridSize - 1;
+      const totalLevels = getTotalLevels();
+      const isCompleted = isWin && prev.level >= totalLevels;
+
+      if (isWin) {
+        const newCompletedLevels = [...prev.completedLevels];
+        if (!newCompletedLevels.includes(prev.level)) {
+          newCompletedLevels.push(prev.level);
+        }
+        const nextLevel = prev.level + 1;
+        if (nextLevel <= totalLevels && !newCompletedLevels.includes(nextLevel)) {
+          newCompletedLevels.push(nextLevel);
+        }
+        saveCompletedLevels(newCompletedLevels);
+
+        return {
+          ...prev,
+          playerPosition: { x: newX, y: newY },
+          moveCount: prev.moveCount + moves,
+          isWin,
+          isCompleted,
+          completedLevels: newCompletedLevels,
+        };
+      }
+
+      return {
+        ...prev,
+        playerPosition: { x: newX, y: newY },
+        moveCount: prev.moveCount + moves,
+        isWin,
+        isCompleted,
+      };
+    });
+  }, [saveCompletedLevels]);
+
   const resetGame = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -186,6 +257,7 @@ export const useGame = () => {
     gameState,
     startGame,
     movePlayer,
+    movePlayerToJunction,
     nextLevel,
     resetGame,
   };
