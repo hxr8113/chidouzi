@@ -15,17 +15,30 @@ export const GameControls: React.FC<GameControlsProps> = ({ onMove, enabled = tr
     right: null,
   });
 
+  const timeoutRefs = useRef<{ [key in Direction]: number | null }>({
+    up: null,
+    down: null,
+    left: null,
+    right: null,
+  });
+
   const startMove = useCallback((direction: Direction) => {
     if (!enabled) return;
     
     onMove(direction);
     
-    intervalRefs.current[direction] = window.setInterval(() => {
-      onMove(direction);
-    }, 100);
+    timeoutRefs.current[direction] = window.setTimeout(() => {
+      intervalRefs.current[direction] = window.setInterval(() => {
+        onMove(direction);
+      }, 150);
+    }, 300);
   }, [onMove, enabled]);
 
   const stopMove = useCallback((direction: Direction) => {
+    if (timeoutRefs.current[direction]) {
+      clearTimeout(timeoutRefs.current[direction]);
+      timeoutRefs.current[direction] = null;
+    }
     if (intervalRefs.current[direction]) {
       clearInterval(intervalRefs.current[direction]);
       intervalRefs.current[direction] = null;
